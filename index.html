@@ -140,18 +140,18 @@ function runCameraCycle() {
     let pauseAfter = 500; // Минимальная пауза между фазами для плавности
 
     switch (currentState) {
-        case 0: 
+case 0: 
             // ФАЗА 1: Плавный отъезд назад на общий план
-            targetPitch = -6;
-            targetHfov = 115; // Широкий угол
+            targetPitch = 3;   // Чуть выше горизонта, чтобы охватить всю высоту зала
+            targetHfov = 115;  // Широкий угол
             duration = 4500;
             pauseAfter = 800;
             break;
 
         case 1: 
-            // ФАЗА 2: Поворот камеры к следующему стенду на общем плане
-            targetYaw = currentYaw + 50; // Поворот на 50 градусов
-            targetPitch = -5;
+            // ФАЗА 2: Поворот камеры к следующему стенду
+            targetYaw = currentYaw + 50; 
+            targetPitch = 4;   // Держим уровень экспонатов, не падаем к полу
             targetHfov = 110; 
             duration = 5000;
             pauseAfter = 600;
@@ -159,26 +159,24 @@ function runCameraCycle() {
 
         case 2: 
             // ФАЗА 3: Наплыв вглубь к стенду
-            targetPitch = -10; // Целимся в центр/низ стенда
-            targetHfov = 52;   // Крупный план
+            targetPitch = 8;   // Целимся прямо в стенд над тумбами (а не вниз!)
+            targetHfov = 52;   // Крупный план экспонатов
             duration = 4500;
-            pauseAfter = 1200; // Пауза, чтобы зафиксировать взгляд
+            pauseAfter = 1200; 
             break;
 
         case 3: 
-            // ФАЗА 4: Медленное скольжение по стенду (чуть вбок или чуть вверх)
-            // Чередуем: сдвиг по горизонтали или подъем вверх
+            // ФАЗА 4: Медленное скольжение по стенду ВВЕРХ или ВБОК
             if (Math.random() > 0.5) {
-                targetYaw = currentYaw + 15; // Плавное смещение вбок на 15 градусов
-                targetPitch = -8;
+                targetYaw = currentYaw + 15; // Смещение вбок по экспонатам
+                targetPitch = 8;
             } else {
-                targetPitch = -2;            // Плавный подъём вверх по стенду
+                targetPitch = 16;            // Подъём ВВЕРХ к экспонатам под самым потолком
             }
             targetHfov = 52;   // Сохраняем крупный план
-            duration = 5000;   // Неторопливое скольжение
-            pauseAfter = 1500; // Финальная пауза для рассмотрения
+            duration = 5000;   
+            pauseAfter = 1500; 
             break;
-    }
 
     // Выполняем фазовое движение
     viewer.lookAt(targetPitch, targetYaw, targetHfov, duration);
