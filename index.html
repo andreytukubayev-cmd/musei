@@ -114,17 +114,11 @@ const viewer = pannellum.viewer('panorama', {
 });
 
 // ==========================================
-// ЛОГИЧЕСКИЙ ОПЕРАТОРСКИЙ ЦИКЛ (STATE MACHINE)
+// ИСПРАВЛЕННЫЙ ЦИКЛ: ПОСТОЯННОЕ ДВИЖЕНИЕ ВПЕРЕД
 // ==========================================
 
 let isUserInteracting = false;
 let autoTimer = null;
-
-// Состояния оператора:
-// 0: Отъезд на широкий угол
-// 1: Поворот к следующему стенду
-// 2: Наплыв на стенд (приближение)
-// 3: Медленное скольжение (панорама влево/вправо/вверх)
 let currentState = 0; 
 
 function runCameraCycle() {
@@ -136,56 +130,54 @@ function runCameraCycle() {
     let targetYaw = currentYaw;
     let targetPitch = currentPitch;
     let targetHfov = 90;
-    let duration = 4000;
-    let pauseAfter = 500; // Пауза между фазами для плавности
+    let duration = 4500;
+    let pauseAfter = 600;
 
     switch (currentState) {
         case 0: 
-            // ФАЗА 1: Плавный отъезд назад на общий план
-            targetPitch = 3;   // Уровень глаз / чуть выше
-            targetHfov = 115;  // Широкий угол
+            // ФАЗА 1: Оход назад на общий план (сохраняем направление)
+            targetPitch = 3;   
+            targetHfov = 115;  
+            duration = 4000;
+            pauseAfter = 600;
+            break;
+
+        case 1: 
+            // ФАЗА 2: ОЩУТИМЫЙ разворот к СЛЕДУЮЩЕМУ стенду (+90 градусов)
+            targetYaw = currentYaw + 90; 
+            targetPitch = 4;   
+            targetHfov = 105; 
             duration = 4500;
             pauseAfter = 800;
             break;
 
-        case 1: 
-            // ФАЗА 2: Поворот камеры к следующему стенду
-            targetYaw = currentYaw + 50; 
-            targetPitch = 4;   // Держим фокус на уровне экспозиции
-            targetHfov = 110; 
-            duration = 5000;
-            pauseAfter = 600;
-            break;
-
         case 2: 
-            // ФАЗА 3: Наплыв вглубь к стенду
-            targetPitch = 8;   // Наводимся на стенд (выше тумб и батарей)
-            targetHfov = 52;   // Крупный план
-            duration = 4500;
+            // ФАЗА 3: Наплыв на НОВЫЙ стенд (под углом чуть выше тумб)
+            targetPitch = 8;   
+            targetHfov = 52;   
+            duration = 4000;
             pauseAfter = 1200; 
             break;
 
         case 3: 
-            // ФАЗА 4: Скольжение по стенду ВВЕРХ или ВБОК
+            // ФАЗА 4: Плавное скольжение СТРОГО ВПЕРЕД по стенду (+20 градусов) или ВВЕРХ
             if (Math.random() > 0.5) {
-                targetYaw = currentYaw + 15; // Смещение вбок по экспонатам
+                targetYaw = currentYaw + 20; // Проводка только ВПЕРЕД
                 targetPitch = 8;
             } else {
-                targetPitch = 16;            // Подъём ВВЕРХ к экспонатам под потолком
+                targetPitch = 16;            // Подъем вверх к верхним экспонатам
             }
-            targetHfov = 52;   // Сохраняем крупный план
-            duration = 5000;   
+            targetHfov = 52;   
+            duration = 4500;   
             pauseAfter = 1500; 
             break;
-    } // <-- Закрывающий блок switch
+    }
 
-    // Выполняем фазовое движение
     viewer.lookAt(targetPitch, targetYaw, targetHfov, duration);
 
-    // Переходим к следующей фазе цикла (0 -> 1 -> 2 -> 3 -> 0)
+    // Переходим к следующей фазе
     currentState = (currentState + 1) % 4;
 
-    // Планируем следующий шаг: время полёта + пауза
     autoTimer = setTimeout(runCameraCycle, duration + pauseAfter);
 }
 
@@ -193,34 +185,32 @@ function stopCameraAnimation() {
     isUserInteracting = true;
     if (autoTimer) clearTimeout(autoTimer);
     
-    // После действий пользователя ждем 4 секунды и возобновляем цикл с отъезда (Фаза 0)
     clearTimeout(window.resumeTimer);
     window.resumeTimer = setTimeout(function() {
         isUserInteracting = false;
-        currentState = 0; // Сбрасываем цикл на отъезд
+        currentState = 0; 
         runCameraCycle();
     }, 4000);
 }
 
-// Отслеживание действий пользователя (мышь, тач, колесо)
+// Отслеживание действий пользователя
 const panoElement = document.getElementById('panorama');
 panoElement.addEventListener('mousedown', stopCameraAnimation);
 panoElement.addEventListener('touchstart', stopCameraAnimation);
 panoElement.addEventListener('wheel', stopCameraAnimation);
 
-// Запуск сразу после загрузки
+// Запуск при загрузке
 viewer.on('load', function() {
     runCameraCycle();
 });
 
-// Запасной старт
 setTimeout(function() {
     if (!isUserInteracting && !autoTimer) {
         runCameraCycle();
     }
 }, 300);
 
-// Открытие модального окна
+// Открытие/закрытие модального окна
 function showModal(imageSrc) {
     const modal = document.getElementById('myModal');
     const modalImg = document.getElementById('modalImg');
@@ -231,7 +221,6 @@ function showModal(imageSrc) {
     stopCameraAnimation();
 }
 
-// Закрытие окна по крестику
 function closeModal() {
     document.getElementById('myModal').style.display = 'none';
     stopCameraAnimation();
