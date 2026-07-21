@@ -114,84 +114,92 @@ const viewer = pannellum.viewer('panorama', {
 });
 
 // ==========================================
-// СЛУЧАЙНЫЙ ПОЛЁТ С ВЕРТИКАЛЬНЫМ СКАННИРОВАНИЕМ СТЕНДОВ
+// ЛОГИЧЕСКИЙ ОПЕРАТОРСКИЙ ЦИКЛ (STATE MACHINE)
 // ==========================================
 
 let isUserInteracting = false;
 let autoTimer = null;
 
-// Функция для генерации случайных чисел
-function getRandom(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+// Состояния оператора:
+// 0: Отъезд на широкий угол
+// 1: Поворот к следующему участку
+// 2: Наплыв на стенд (приближение)
+// 3: Медленное скольжение (панорама влево/вправо/вверх)
+let currentState = 0; 
 
-function playRandomCameraStep() {
+function runCameraCycle() {
     if (isUserInteracting || !viewer) return;
 
     const currentYaw = viewer.getYaw();
-    
-    // 1. Направление поворота (в основном вперед на 40-75 градусов)
-    const direction = Math.random() > 0.15 ? 1 : -1; 
-    const targetYaw = currentYaw + (getRandom(40, 75) * direction);
+    const currentPitch = viewer.getPitch();
 
-    // 2. Решаем: делаем НАПЛЫВ с вертикальным сканированием или просто ОТХОД на общий план?
-    const isZoomIn = Math.random() > 0.4; // 60% chance for close-up scan
+    let targetYaw = currentYaw;
+    let targetPitch = currentPitch;
+    let targetHfov = 90;
+    let duration = 4000;
+    let pauseAfter = 500; // Минимальная пауза между фазами для плавности
 
-    if (isZoomIn) {
-        // === СЦЕНАРИЙ 1: НАПЛЫВ + ВЕРТИКАЛЬНЫЙ ОСМОТР ===
-        
-        // Случайно решаем: начинаем СНИЗУ вверх или СВЕРХУ вниз
-        const startFromBottom = Math.random() > 0.5;
-        
-        // Нижняя точка (-15...-10 град) и Верхняя точка (-4...-1 град)
-        const bottomPitch = getRandom(-15, -10);
-        const topPitch = getRandom(-4, -1);
+    switch (currentState) {
+        case 0: 
+            // ФАЗА 1: Плавный отъезд назад на общий план
+            targetPitch = -6;
+            targetHfov = 115; // Широкий угол
+            duration = 4500;
+            pauseAfter = 800;
+            break;
 
-        const initialPitch = startFromBottom ? bottomPitch : topPitch;
-        const finalPitch = startFromBottom ? topPitch : bottomPitch;
+        case 1: 
+            // ФАЗА 2: Поворот камеры к следующему стенду на общем плане
+            targetYaw = currentYaw + 50; // Поворот на 50 градусов
+            targetPitch = -5;
+            targetHfov = 110; 
+            duration = 5000;
+            pauseAfter = 600;
+            break;
 
-        const targetHfov = getRandom(45, 58); // Глубокий наплыв
-        const moveDuration = getRandom(3500, 4500); // Время подлёта
-        const scanDuration = getRandom(4000, 5500); // Время медленного движения по вертикали
+        case 2: 
+            // ФАЗА 3: Наплыв вглубь к стенду
+            targetPitch = -10; // Целимся в центр/низ стенда
+            targetHfov = 52;   // Крупный план
+            duration = 4500;
+            pauseAfter = 1200; // Пауза, чтобы зафиксировать взгляд
+            break;
 
-        // ШАГ 1: Подлетаем к стенду (в нижнюю или верхнюю часть)
-        viewer.lookAt(initialPitch, targetYaw, targetHfov, moveDuration);
-
-        // ШАГ 2: После прилёта запускаем плавное движение по вертикали (вверх или вниз)
-        autoTimer = setTimeout(function() {
-            if (isUserInteracting) return;
-
-            // Медленно ведем камеру по вертикали, сохраняя Yaw и Hfov
-            viewer.lookAt(finalPitch, targetYaw, targetHfov, scanDuration);
-
-            // ШАГ 3: Завершаем осмотр, пауза 1.5 сек и переход к следующей точке
-            autoTimer = setTimeout(playRandomCameraStep, scanDuration + 1500);
-
-        }, moveDuration + 500); // Небольшая пауза 0.5сек перед началом вертикального движения
-
-    } else {
-        // === СЦЕНАРИЙ 2: ОТХОД НА ОБЩИЙ ПЛАН ===
-        
-        const targetPitch = getRandom(-12, -3);
-        const targetHfov = getRandom(105, 122); // Широкий угол
-        const duration = getRandom(3500, 4500);
-
-        viewer.lookAt(targetPitch, targetYaw, targetHfov, duration);
-
-        // Пауза 2 секунды на общем плане и следующий шаг
-        autoTimer = setTimeout(playRandomCameraStep, duration + 2000);
+        case 3: 
+            // ФАЗА 4: Медленное скольжение по стенду (чуть вбок или чуть вверх)
+            // Чередуем: сдвиг по горизонтали или подъем вверх
+            if (Math.random() > 0.5) {
+                targetYaw = currentYaw + 15; // Плавное смещение вбок на 15 градусов
+                targetPitch = -8;
+            } else {
+                targetPitch = -2;            // Плавный подъём вверх по стенду
+            }
+            targetHfov = 52;   // Сохраняем крупный план
+            duration = 5000;   // Неторопливое скольжение
+            pauseAfter = 1500; // Финальная пауза для рассмотрения
+            break;
     }
+
+    // Выполняем фазовое движение
+    viewer.lookAt(targetPitch, targetYaw, targetHfov, duration);
+
+    // Переходим к следующей фазе цикла (0 -> 1 -> 2 -> 3 -> 0)
+    currentState = (currentState + 1) % 4;
+
+    // Планируем следующий шаг: время полёта + пауза
+    autoTimer = setTimeout(runCameraCycle, duration + pauseAfter);
 }
 
 function stopCameraAnimation() {
     isUserInteracting = true;
     if (autoTimer) clearTimeout(autoTimer);
     
-    // После действий пользователя ждем 4 секунды и возобновляем режиссёрский просмотр
+    // После действий пользователя ждем 4 секунды и возобновляем цикл с отъезда (Фаза 0)
     clearTimeout(window.resumeTimer);
     window.resumeTimer = setTimeout(function() {
         isUserInteracting = false;
-        playRandomCameraStep();
+        currentState = 0; // Сбрасываем цикл на отъезд
+        runCameraCycle();
     }, 4000);
 }
 
@@ -203,13 +211,13 @@ panoElement.addEventListener('wheel', stopCameraAnimation);
 
 // Запуск сразу после загрузки
 viewer.on('load', function() {
-    playRandomCameraStep();
+    runCameraCycle();
 });
 
 // Запасной старт
 setTimeout(function() {
     if (!isUserInteracting && !autoTimer) {
-        playRandomCameraStep();
+        runCameraCycle();
     }
 }, 300);
 
