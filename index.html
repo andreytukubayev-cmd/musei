@@ -60,7 +60,6 @@ function createStandPreview(hotSpotDiv, args) {
     hotSpotDiv.classList.add('stand-preview');
     hotSpotDiv.style.backgroundImage = 'url(' + args.image + ')';
     
-    // Ручной клик пользователя
     hotSpotDiv.onclick = function(e) {
         if (e) e.stopPropagation();
         showModal(args.image);
@@ -73,8 +72,8 @@ const viewer = pannellum.viewer('panorama', {
         "firstScene": "entrance",
         "author": "Ақмола облысы білім басқармасының жанындағы Бурабай ауданы, Щучинск қаласы",
         "autoLoad": true,
-        "minPitch": -25, /* Жесткий лимит: пользователь сам не сможет задрать камеру в потолок */
-        "maxPitch": 5
+        "autoRotate": -2.5, /* Базовое плавное вращение влево */
+        "autoRotateInactivityDelay": 4000 /* Автовозврат к вращению через 4 секунды после отпускания мыши */
     },
 
     "scenes": {
@@ -116,81 +115,23 @@ const viewer = pannellum.viewer('panorama', {
     }
 });
 
-// ==========================================
-// ПЛАВНАЯ КИНЕМАТОГРАФИЧЕСКАЯ КАМЕРА (АНИМАЦИЯ НА СИНУСАХ)
-// ==========================================
+// Мягкое "дыхание" высотой и зумом во время автопрокрутки
+let zoomStep = 0;
+setInterval(function() {
+    if (!viewer) return;
 
-let isAutoPlaying = true;
-let animFrameId = null;
-let rotateTimeout = null;
-const delayTime = 4000; // Пауза 4 сек после ручного взаимодействия
-let step = 0;
+    // Проверяем, находится ли плеер в режиме автопрокрутки
+    if (viewer.isAutoRotating()) {
+        zoomStep += 0.03;
+        
+        // Волнообразно меняем зум (от 90 до 105) и угол наклона (от -8 до -2 градусов)
+        let targetHfov = 97.5 + Math.sin(zoomStep) * 7.5;
+        let targetPitch = -5 + Math.sin(zoomStep * 0.7) * 3;
 
-function smoothCameraAnimation() {
-    if (isAutoPlaying && viewer) {
-        step += 0.008; // Скорость динамики (чем меньше, тем выше плановость)
-
-        // 1. Постоянный мягкий поворот по горизонтали (yaw)
-        let currentYaw = viewer.getYaw() + 0.05; 
-        if (currentYaw > 180) currentYaw -= 360;
-
-        // 2. Плавное синусоидальное смещение по высоте (pitch)
-        // Строго от -12 до -2 градусов — потолок ВООБЩЕ не попадает в кадр
-        let targetPitch = -7 + (Math.sin(step * 0.7) * 5);
-
-        // 3. Плавное "дыхание" зумом (hfov): от 85 (чуть ближе) до 105 (чуть дальше)
-        let targetHfov = 95 + (Math.sin(step * 0.5) * 10);
-
-        // Обновляем позицию кадра прямо в моменте
-        viewer.setPitch(targetPitch, false);
-        viewer.setYaw(currentYaw, false);
         viewer.setHfov(targetHfov, false);
-
-        // Запрашиваем следующий кадр анимации монитора (60 FPS)
-        animFrameId = requestAnimationFrame(smoothCameraAnimation);
+        viewer.setPitch(targetPitch, false);
     }
-}
-
-function startAutoCamera() {
-    // Не запускаем, если открыта модалка
-    const modal = document.getElementById('myModal');
-    if (modal && modal.style.display === 'flex') return;
-
-    if (!isAutoPlaying) {
-        isAutoPlaying = true;
-        smoothCameraAnimation();
-    }
-}
-
-function stopAutoCamera() {
-    isAutoPlaying = false;
-    if (animFrameId) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-    }
-    
-    // Перезапускаем отсчет возврата к живой камере
-    clearTimeout(rotateTimeout);
-    rotateTimeout = setTimeout(startAutoCamera, delayTime);
-}
-
-// Отслеживаем любые действия пользователя (мышка, тач, колесико)
-const panoElement = document.getElementById('panorama');
-panoElement.addEventListener('mousedown', stopAutoCamera);
-panoElement.addEventListener('mousemove', function(e) {
-    // Останавливаем только если пользователь реально зажал кнопку и тащит
-    if (e.buttons === 1) stopAutoCamera();
-});
-panoElement.addEventListener('touchstart', stopAutoCamera);
-panoElement.addEventListener('wheel', stopAutoCamera);
-
-// Запуск анимации сразу после прогрузки
-viewer.on('load', function() {
-    startAutoCamera();
-});
-
-// Дополнительный старт, если загрузка произошла мгновенно
-startAutoCamera();
+}, 50);
 
 // Открытие модального окна
 function showModal(imageSrc) {
@@ -200,14 +141,14 @@ function showModal(imageSrc) {
     modalImg.src = imageSrc;
     modal.style.display = 'flex';
     
-    // Полностью выключаем камеру, пока открыта картинка
-    stopAutoCamera();
+    // Останавливаем вращение, когда смотришь стенд
+    if (viewer) viewer.stopAutoRotate();
 }
 
 // Закрытие окна по крестику
 function closeModal() {
     document.getElementById('myModal').style.display = 'none';
-    stopAutoCamera(); // Возобновит таймер отсчета
+    if (viewer) viewer.startAutoRotate(-2.5);
 }
 </script>
 
