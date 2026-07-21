@@ -7,7 +7,7 @@
     <!-- Плеер Pannellum -->
     <link rel="stylesheet" href="style.css"/>
     <script type="text/javascript" src="js.js"></script>
-<style>
+    <style>
         html, body, #panorama { padding: 0; margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
         
         /* Заставляем всплывающее окно подстраиваться под экран и разрешаем скролл */
@@ -35,14 +35,21 @@
 
 <div id="panorama"></div>
 
+<!-- Модальное окно для стендов -->
+<div id="myModal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.85); justify-content:center; align-items:center; overflow-y:auto; padding:20px; box-sizing:border-box;" onclick="this.style.display='none'">
+    <img id="modalImg" style="max-width:90%; max-height:90vh; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.6); display:block; margin:auto;" src="" alt="Стенд">
+    <div style="position:fixed; top:20px; right:30px; color:#fff; font-size:40px; font-weight:bold; cursor:pointer;">&times;</div>
+</div>
+
 <script>
-// Помещаем закодированную картинку в переменную
+// Пути к панорамам
 const imgPoint1 = "pano/001_small.jpg";
 const imgPoint2 = "pano/002_small.jpg";
 
-// Добавляем картинку стенда
+// Картинка стенда
 const stand1 = "stend/001.jpg";
-// Настраиваем плеер и сохраняем его в переменную viewer
+
+// Настраиваем плеер
 const viewer = pannellum.viewer('panorama', {
     "default": {
         "firstScene": "entrance",
@@ -59,18 +66,18 @@ const viewer = pannellum.viewer('panorama', {
             "hfov": 100,
             "hotSpots": [
                 {
-                    "pitch": 5,    /* Координата стрелки по вертикали (от -90 до 90) */
-                    "yaw": 5,     /* Координата стрелки по горизонтали (от -180 до 180) */
+                    "pitch": 5,    /* Координата стрелки по вертикали */
+                    "yaw": 5,      /* Координата стрелки по горизонтали */
                     "type": "scene",
                     "text": "Перейти сюда",
-                    "sceneId": "room1" /* ID сцены, куда ведет стрелка */
+                    "sceneId": "room1"
                 }
             ]
         },
         "room1": {
             "title": "Жоғары техникалық колледжі музейі",
             "type": "equirectangular",
-            "panorama": imgPoint2, /* Когда сделаете вторую точку, вставите сюда переменную для неё */
+            "panorama": imgPoint2,
             "hotSpots": [
                 {
                     "pitch": 5,
@@ -79,14 +86,13 @@ const viewer = pannellum.viewer('panorama', {
                     "text": "Перейти сюда",
                     "sceneId": "entrance"
                 },
-				/* ВОТ НОВАЯ ТОЧКА ДЛЯ СТЕНДА */
-        {
-            "pitch": -5, 
-            "yaw": 140,        
-            "type": "info", 
-            "text": "Информация",
-            "clickHandlerFunc": function() { showModal(stand1); }
-        }
+                {
+                    "pitch": -5, 
+                    "yaw": 140,        
+                    "type": "info", 
+                    "text": "Информация",
+                    "clickHandlerFunc": function() { showModal(stand1); }
+                }
             ]
         }
     }
@@ -94,90 +100,71 @@ const viewer = pannellum.viewer('panorama', {
 
 // Автоматический возврат к вращению после бездействия
 let rotateTimeout;
-const delayTime = 4000; // Время ожидания в миллисекундах
+const delayTime = 4000;
 
 function startAutoRotate() {
     if (viewer) {
-        viewer.startAutoRotate(-2); // Перезапускаем вращение с прежней скоростью
+        viewer.startAutoRotate(-2);
     }
 }
 
 function stopAndResetTimer() {
-    // Как только пользователь тронул панораму — сбрасываем таймер
     clearTimeout(rotateTimeout);
-    
-    // И запускаем отсчет заново. Если 5 секунд тишины — прокрутка включится сама
     rotateTimeout = setTimeout(startAutoRotate, delayTime);
 }
 
-// Отслеживаем действия пользователя на блоке панорамы
+// Отслеживаем действия пользователя
 const panoElement = document.getElementById('panorama');
 panoElement.addEventListener('mousedown', stopAndResetTimer);
 panoElement.addEventListener('mousemove', stopAndResetTimer);
 panoElement.addEventListener('touchstart', stopAndResetTimer);
 
-let modalTimer = null; // Переменная для хранения таймера
+let modalTimer = null;
 
 // Функция для открытия модального окна со стендом
 function showModal(imageSrc) {
     const modal = document.getElementById('myModal');
     const modalImg = document.getElementById('modalImg');
     
-    // Если уже был запущен таймер от предыдущего открытия — сбрасываем его
     if (modalTimer) clearTimeout(modalTimer);
 
     modalImg.src = imageSrc;
     modal.style.display = 'flex';
 
-    // Автоматически закрываем окно ровно через 5000 миллисекунд (5 секунд)
     modalTimer = setTimeout(function() {
         modal.style.display = 'none';
     }, 5000);
 }
 
-// Список стендов с координатами и флагом "был ли показан"
-// Укажите здесь точные pitch и yaw вашего стенда!
+// Список стендов для автопросмотра (yaw: 140 совпадает с вашей точкой в room1)
 const autoInfoSpots = [
-    { pitch: -5, yaw: 140, img: stand1, triggered: false } 
-    // Если стендов несколько, можно добавлять их через запятую:
-    // { pitch: -2.1, yaw: 110.5, img: stand2, triggered: false }
+    { scene: 'room1', yaw: 140, img: stand1, triggered: false } 
 ];
 
-// Список стендов: указываем только горизонтальный угол (yaw) и переменную картинки
-const autoInfoSpots = [
-    { yaw: 42.1, img: stand1, triggered: false } 
-    // Если стендов несколько, добавляйте их сюда:
-    // { yaw: -110.5, img: stand2, triggered: false }
-];
-
-// Проверяем положение камеры 5 раз в секунду
+// Проверяем положение камеры
 setInterval(function() {
-    if (typeof viewer === 'undefined' || !viewer) return;
+    if (typeof viewer === 'undefined' || !viewer || typeof viewer.getYaw !== 'function') return;
 
+    // Проверяем автооткрытие только если загружена нужная сцена
+    const currentScene = viewer.getScene();
     const currentYaw = viewer.getYaw();
 
     autoInfoSpots.forEach(spot => {
-        // Считаем разницу по горизонтали с учетом перехода через -180/180 градусов
+        if (currentScene !== spot.scene) return;
+
         let yawDiff = Math.abs(currentYaw - spot.yaw);
         if (yawDiff > 180) yawDiff = 360 - yawDiff;
 
-        // 1. Увеличили зону до 8 градусов (теперь не надо наводить прямо в "яблочко")
-        // 2. Исключили проверку pitch (вертикаль больше не важна)
         if (yawDiff < 8 && !spot.triggered) {
-            spot.triggered = true; // Фиксируем показ
-            showModal(spot.img);   // Открываем окно на 5 секунд
+            spot.triggered = true;
+            showModal(spot.img);   
         } 
-        // Если прокрутили дальше (более чем на 25 градусов от стенда) — сбрасываем флаг
         else if (yawDiff > 25 && spot.triggered) {
             spot.triggered = false;
         }
     });
 }, 200);
 </script>
-<!-- Модальное окно для стендов -->
-<div id="myModal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.85); justify-content:center; align-items:center; overflow-y:auto; padding:20px; box-sizing:border-box;" onclick="this.style.display='none'">
-    <img id="modalImg" style="max-width:90%; max-height:90vh; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.6); display:block; margin:auto;" src="" alt="Стенд">
-    <div style="position:fixed; top:20px; right:30px; color:#fff; font-size:40px; font-weight:bold; cursor:pointer;">&times;</div>
-</div>
+
 </body>
 </html>
