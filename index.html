@@ -124,18 +124,18 @@ let stepIndex = 0;
 // Массив из 12 точек с шагом 30 градусов.
 // DURATION 12000-15000 мс (12-15 секунд) делает движение невероятно неторопливым.
 const cameraSteps = [
-    { yaw: 0,   pitch: -4,  hfov: 100, duration: 12000 },
-    { yaw: 30,  pitch: -8,  hfov: 90,  duration: 14000 }, // Мягкий наплыв
-    { yaw: 60,  pitch: -12, hfov: 85,  duration: 15000 }, // Максимальное приближение к стене
-    { yaw: 90,  pitch: -7,  hfov: 95,  duration: 13000 }, // Неторопливое отдаление
-    { yaw: 120, pitch: -3,  hfov: 102, duration: 12000 }, // Общий план
-    { yaw: 150, pitch: -6,  hfov: 92,  duration: 14000 }, // Наплыв на следующий угол
-    { yaw: 180, pitch: -10, hfov: 88,  duration: 15000 }, // Рассмотрение экспонатов
-    { yaw: 210, pitch: -5,  hfov: 98,  duration: 13000 }, 
-    { yaw: 240, pitch: -2,  hfov: 102, duration: 12000 }, // Отход назад
-    { yaw: 270, pitch: -7,  hfov: 90,  duration: 14000 }, // Акцент на стенде
-    { yaw: 300, pitch: -11, hfov: 86,  duration: 15000 }, 
-    { yaw: 330, pitch: -5,  hfov: 96,  duration: 13000 }
+    { yaw: 0,   pitch: -4,  hfov: 115, duration: 12000 }, // Сильный отход назад (общий план)
+    { yaw: 30,  pitch: -8,  hfov: 80,  duration: 14000 }, 
+    { yaw: 60,  pitch: -12, hfov: 60,  duration: 15000 }, // МОЩНЫЙ НАПЛЫВ (крупный план стенда)
+    { yaw: 90,  pitch: -7,  hfov: 95,  duration: 13000 }, 
+    { yaw: 120, pitch: -3,  hfov: 120, duration: 12000 }, // Снова глубокое отдаление
+    { yaw: 150, pitch: -6,  hfov: 75,  duration: 14000 }, 
+    { yaw: 180, pitch: -10, hfov: 58,  duration: 15000 }, // Второе сильное приближение
+    { yaw: 210, pitch: -5,  hfov: 90,  duration: 13000 }, 
+    { yaw: 240, pitch: -2,  hfov: 118, duration: 12000 }, // Отход назад
+    { yaw: 270, pitch: -7,  hfov: 70,  duration: 14000 }, 
+    { yaw: 300, pitch: -11, hfov: 62,  duration: 15000 }, // Глубокий зум
+    { yaw: 330, pitch: -5,  hfov: 105, duration: 13000 }
 ];
 
 function playNextCameraStep() {
