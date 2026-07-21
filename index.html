@@ -114,28 +114,26 @@ const viewer = pannellum.viewer('panorama', {
 });
 
 // ==========================================
-// МЕДЛЕННАЯ РЕЖИССУРА: 12 ПЛАВНЫХ ТОЧЕК
+// ДИНАМИЧНЫЙ ПОЛЁТ: СОЧНЫЙ ЗУМ И ОЩУТИМАЯ СКОРОСТЬ
 // ==========================================
 
 let isUserInteracting = false;
 let autoTimer = null;
 let stepIndex = 0;
 
-// Массив из 12 точек с шагом 30 градусов.
-// DURATION 12000-15000 мс (12-15 секунд) делает движение невероятно неторопливым.
+// hfov: 45 — ГЛУБОКИЙ НАПЛЫВ (крупный план)
+// hfov: 125 — ДАЛЕКИЙ ОТХОД (широкий угол, видишь весь зал)
+// duration: 4000-5000 мс — полёт ощутим глазом, а не "ползёт как улитка"
 const cameraSteps = [
-    { yaw: 0,   pitch: -4,  hfov: 115, duration: 12000 }, // Сильный отход назад (общий план)
-    { yaw: 30,  pitch: -8,  hfov: 80,  duration: 14000 }, 
-    { yaw: 60,  pitch: -12, hfov: 60,  duration: 15000 }, // МОЩНЫЙ НАПЛЫВ (крупный план стенда)
-    { yaw: 90,  pitch: -7,  hfov: 95,  duration: 13000 }, 
-    { yaw: 120, pitch: -3,  hfov: 120, duration: 12000 }, // Снова глубокое отдаление
-    { yaw: 150, pitch: -6,  hfov: 75,  duration: 14000 }, 
-    { yaw: 180, pitch: -10, hfov: 58,  duration: 15000 }, // Второе сильное приближение
-    { yaw: 210, pitch: -5,  hfov: 90,  duration: 13000 }, 
-    { yaw: 240, pitch: -2,  hfov: 118, duration: 12000 }, // Отход назад
-    { yaw: 270, pitch: -7,  hfov: 70,  duration: 14000 }, 
-    { yaw: 300, pitch: -11, hfov: 62,  duration: 15000 }, // Глубокий зум
-    { yaw: 330, pitch: -5,  hfov: 105, duration: 13000 }
+    { yaw: 0,   pitch: -5,  hfov: 125, duration: 4500 }, // Далёкий отлёт назад (широкий план)
+    { yaw: 35,  pitch: -12, hfov: 50,  duration: 5000 }, // МОЩНЫЙ НАПЛЫВ вглубь на стенд
+    { yaw: 70,  pitch: -2,  hfov: 115, duration: 4500 }, // Быстрый отлёт в другую сторону
+    { yaw: 110, pitch: -10, hfov: 45,  duration: 5000 }, // Глубокое приближение к экспонату
+    { yaw: 150, pitch: -4,  hfov: 120, duration: 4500 }, // Отлёт назад
+    { yaw: 190, pitch: -14, hfov: 55,  duration: 5000 }, // Наплыв с изменением высоты
+    { yaw: 230, pitch: -3,  hfov: 115, duration: 4500 }, // Отлёт назад
+    { yaw: 270, pitch: -12, hfov: 48,  duration: 5000 }, // Мощное приближение
+    { yaw: 310, pitch: -5,  hfov: 125, duration: 4500 }  // Возврат на широкий угол
 ];
 
 function playNextCameraStep() {
@@ -143,13 +141,12 @@ function playNextCameraStep() {
 
     const step = cameraSteps[stepIndex];
 
-    // Метод lookAt плавно растягивает переход на указанные секунды (duration)
+    // Выполняем ощутимый перелёт
     viewer.lookAt(step.pitch, step.yaw, step.hfov, step.duration);
 
-    // Переходим к следующей точке
     stepIndex = (stepIndex + 1) % cameraSteps.length;
 
-    // Запускаем следующий шаг ровно тогда, когда завершится текущий
+    // Сразу планируем следующий перелёт ровно по окончании текущего
     autoTimer = setTimeout(playNextCameraStep, step.duration);
 }
 
@@ -157,31 +154,38 @@ function stopCameraAnimation() {
     isUserInteracting = true;
     if (autoTimer) clearTimeout(autoTimer);
     
-    // Если посетитель отпустил мышь — ждем 5 секунд и возобновляем плавание
+    // После действия пользователя ждем 4 секунды и снова запускаем полёт
     clearTimeout(window.resumeTimer);
     window.resumeTimer = setTimeout(function() {
         isUserInteracting = false;
         
-        // Синхронизируем траекторию автокамеры с текущим углом поворота пользователя
+        // Пересчитываем траекторию от текущей точки пользователя
         const currentYaw = viewer.getYaw();
         for (let i = 0; i < cameraSteps.length; i++) {
-            cameraSteps[i].yaw = currentYaw + (i * 30);
+            cameraSteps[i].yaw = currentYaw + (i * 40);
         }
         stepIndex = 0;
         playNextCameraStep();
-    }, 5000);
+    }, 4000);
 }
 
-// Отслеживание кликов и перетаскивания мыши
+// Отслеживание действий пользователя
 const panoElement = document.getElementById('panorama');
 panoElement.addEventListener('mousedown', stopCameraAnimation);
 panoElement.addEventListener('touchstart', stopCameraAnimation);
 panoElement.addEventListener('wheel', stopCameraAnimation);
 
-// Запуск при загрузке панорамы
+// ЗАПУСКАЕМ СРАЗУ: без длинных задержек при загрузке
 viewer.on('load', function() {
-    setTimeout(playNextCameraStep, 1000);
+    playNextCameraStep();
 });
+
+// Если событие load уже проскочило — стартуем через 300мс
+setTimeout(function() {
+    if (!isUserInteracting && !autoTimer) {
+        playNextCameraStep();
+    }
+}, 300);
 
 // Открытие модального окна
 function showModal(imageSrc) {
