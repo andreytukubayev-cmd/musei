@@ -66,7 +66,7 @@ function createStandPreview(hotSpotDiv, args) {
     };
 }
 
-// Инициализация Pannellum (ОБЯЗАТЕЛЬНО убираем autoRotate, чтобы он не блокировал зум)
+// Инициализация Pannellum
 const viewer = pannellum.viewer('panorama', {
     "default": {
         "firstScene": "entrance",
@@ -122,7 +122,7 @@ let autoTimer = null;
 
 // Состояния оператора:
 // 0: Отъезд на широкий угол
-// 1: Поворот к следующему участку
+// 1: Поворот к следующему стенду
 // 2: Наплыв на стенд (приближение)
 // 3: Медленное скольжение (панорама влево/вправо/вверх)
 let currentState = 0; 
@@ -137,12 +137,12 @@ function runCameraCycle() {
     let targetPitch = currentPitch;
     let targetHfov = 90;
     let duration = 4000;
-    let pauseAfter = 500; // Минимальная пауза между фазами для плавности
+    let pauseAfter = 500; // Пауза между фазами для плавности
 
     switch (currentState) {
-case 0: 
+        case 0: 
             // ФАЗА 1: Плавный отъезд назад на общий план
-            targetPitch = 3;   // Чуть выше горизонта, чтобы охватить всю высоту зала
+            targetPitch = 3;   // Уровень глаз / чуть выше
             targetHfov = 115;  // Широкий угол
             duration = 4500;
             pauseAfter = 800;
@@ -151,7 +151,7 @@ case 0:
         case 1: 
             // ФАЗА 2: Поворот камеры к следующему стенду
             targetYaw = currentYaw + 50; 
-            targetPitch = 4;   // Держим уровень экспонатов, не падаем к полу
+            targetPitch = 4;   // Держим фокус на уровне экспозиции
             targetHfov = 110; 
             duration = 5000;
             pauseAfter = 600;
@@ -159,24 +159,25 @@ case 0:
 
         case 2: 
             // ФАЗА 3: Наплыв вглубь к стенду
-            targetPitch = 8;   // Целимся прямо в стенд над тумбами (а не вниз!)
-            targetHfov = 52;   // Крупный план экспонатов
+            targetPitch = 8;   // Наводимся на стенд (выше тумб и батарей)
+            targetHfov = 52;   // Крупный план
             duration = 4500;
             pauseAfter = 1200; 
             break;
 
         case 3: 
-            // ФАЗА 4: Медленное скольжение по стенду ВВЕРХ или ВБОК
+            // ФАЗА 4: Скольжение по стенду ВВЕРХ или ВБОК
             if (Math.random() > 0.5) {
                 targetYaw = currentYaw + 15; // Смещение вбок по экспонатам
                 targetPitch = 8;
             } else {
-                targetPitch = 16;            // Подъём ВВЕРХ к экспонатам под самым потолком
+                targetPitch = 16;            // Подъём ВВЕРХ к экспонатам под потолком
             }
             targetHfov = 52;   // Сохраняем крупный план
             duration = 5000;   
             pauseAfter = 1500; 
             break;
+    } // <-- Закрывающий блок switch
 
     // Выполняем фазовое движение
     viewer.lookAt(targetPitch, targetYaw, targetHfov, duration);
