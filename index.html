@@ -66,14 +66,12 @@ function createStandPreview(hotSpotDiv, args) {
     };
 }
 
-// Инициализация Pannellum
+// Инициализация Pannellum (ОБЯЗАТЕЛЬНО убираем autoRotate, чтобы он не блокировал зум)
 const viewer = pannellum.viewer('panorama', {
     "default": {
         "firstScene": "entrance",
         "author": "Ақмола облысы білім басқармасының жанындағы Бурабай ауданы, Щучинск қаласы",
-        "autoLoad": true,
-        "autoRotate": -2.5, /* Базовое плавное вращение влево */
-        "autoRotateInactivityDelay": 4000 /* Автовозврат к вращению через 4 секунды после отпускания мыши */
+        "autoLoad": true
     },
 
     "scenes": {
@@ -115,23 +113,68 @@ const viewer = pannellum.viewer('panorama', {
     }
 });
 
-// Мягкое "дыхание" высотой и зумом во время автопрокрутки
-let zoomStep = 0;
-setInterval(function() {
-    if (!viewer) return;
+// ==========================================
+// НАСТОЯЩАЯ ДИНАМИКА: НАПЛЫВЫ И ОТДАЛЕНИЯ
+// ==========================================
 
-    // Проверяем, находится ли плеер в режиме автопрокрутки
-    if (viewer.isAutoRotating()) {
-        zoomStep += 0.03;
-        
-        // Волнообразно меняем зум (от 90 до 105) и угол наклона (от -8 до -2 градусов)
-        let targetHfov = 97.5 + Math.sin(zoomStep) * 7.5;
-        let targetPitch = -5 + Math.sin(zoomStep * 0.7) * 3;
+let isUserInteracting = false;
+let autoTimer = null;
+let stepIndex = 0;
 
-        viewer.setHfov(targetHfov, false);
-        viewer.setPitch(targetPitch, false);
-    }
-}, 50);
+// Точки режиссуры: плавно меняем Yaw, Pitch (высоту) и HFOV (зум)
+// hfov: 75 — ощутимый НАПЛЫВ (крупный план)
+// hfov: 105 — ОТДАЛЕНИЕ (общий план)
+const cameraSteps = [
+    { yaw: 0,    pitch: -5,  hfov: 105, duration: 6000 },
+    { yaw: 90,   pitch: -12, hfov: 75,  duration: 7000 }, // Наплыв с приближением
+    { yaw: 180,  pitch: -3,  hfov: 100, duration: 6000 }, // Отдаление
+    { yaw: 270,  pitch: -10, hfov: 80,  duration: 7000 }  // Снова наплыв
+];
+
+function playNextCameraStep() {
+    if (isUserInteracting || !viewer) return;
+
+    const step = cameraSteps[stepIndex];
+
+    // Выполняем плавный переход длительностью 'duration' миллисекунд
+    viewer.lookAt(step.pitch, step.yaw, step.hfov, step.duration);
+
+    // Переходим к следующей точке
+    stepIndex = (stepIndex + 1) % cameraSteps.length;
+
+    // Запускаем следующий шаг ровно тогда, когда закончится текущий
+    autoTimer = setTimeout(playNextCameraStep, step.duration);
+}
+
+function stopCameraAnimation() {
+    isUserInteracting = true;
+    if (autoTimer) clearTimeout(autoTimer);
+    
+    // Если пользователь отпустил мышь — ждем 5 секунд и возобновляем режиссуру
+    clearTimeout(window.resumeTimer);
+    window.resumeTimer = setTimeout(function() {
+        isUserInteracting = false;
+        // Синхронизируем текущий угол пользователя с циклом
+        const currentYaw = viewer.getYaw();
+        cameraSteps[0].yaw = currentYaw + 90;
+        cameraSteps[1].yaw = currentYaw + 180;
+        cameraSteps[2].yaw = currentYaw + 270;
+        cameraSteps[3].yaw = currentYaw + 360;
+        stepIndex = 0;
+        playNextCameraStep();
+    }, 5000);
+}
+
+// Отслеживание кликов и перетаскивания мыши
+const panoElement = document.getElementById('panorama');
+panoElement.addEventListener('mousedown', stopCameraAnimation);
+panoElement.addEventListener('touchstart', stopCameraAnimation);
+panoElement.addEventListener('wheel', stopCameraAnimation);
+
+// Запуск при загрузке панорамы
+viewer.on('load', function() {
+    setTimeout(playNextCameraStep, 1000);
+});
 
 // Открытие модального окна
 function showModal(imageSrc) {
@@ -141,14 +184,13 @@ function showModal(imageSrc) {
     modalImg.src = imageSrc;
     modal.style.display = 'flex';
     
-    // Останавливаем вращение, когда смотришь стенд
-    if (viewer) viewer.stopAutoRotate();
+    stopCameraAnimation();
 }
 
 // Закрытие окна по крестику
 function closeModal() {
     document.getElementById('myModal').style.display = 'none';
-    if (viewer) viewer.startAutoRotate(-2.5);
+    stopCameraAnimation();
 }
 </script>
 
