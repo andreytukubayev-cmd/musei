@@ -73,7 +73,8 @@ const viewer = pannellum.viewer('panorama', {
         "firstScene": "entrance",
         "author": "Ақмола облысы білім басқармасының жанындағы Бурабай ауданы, Щучинск қаласы",
         "autoLoad": true,
-        "autoRotate": -2
+        "minPitch": -30, /* Ограничение: пользователь сам не сможет задрать камеру в потолок */
+        "maxPitch": 5
     },
 
     "scenes": {
@@ -115,27 +116,67 @@ const viewer = pannellum.viewer('panorama', {
     }
 });
 
-// Возврат к автовращению после паузы
-let rotateTimeout;
-const delayTime = 4000;
+// ==========================================
+// ДИНАМИЧЕСКАЯ КАМЕРА (БЕЗ ПОКАЗА ПОТОЛКА)
+// ==========================================
+
+let autoMoveInterval = null;
+let rotateTimeout = null;
+const delayTime = 4000; // Задержка 4 сек после ручного взаимодействия
+
+function animateCameraStep() {
+    if (!viewer) return;
+
+    // 1. Ограничение по высоте (pitch): от -15 до 0 градусов (не заглядывает в потолок)
+    const targetPitch = -(Math.random() * 15);
+
+    // 2. Мягкий зум (hfov): от 85 (чуть ближе) до 105 (чуть дальше)
+    const targetHfov = 85 + Math.random() * 20;
+
+    // 3. Плавный поворот вправо на 25 градусов
+    const currentYaw = viewer.getYaw();
+    const targetYaw = currentYaw + 25;
+
+    // Выполняем переход за 3.8 секунды
+    viewer.lookAt(targetPitch, targetYaw, targetHfov, 3800);
+}
 
 function startAutoRotate() {
-    if (viewer) {
-        viewer.startAutoRotate(-2);
-    }
+    if (!viewer) return;
+
+    // Если сейчас открыто модальное окно — не запускаем движение
+    const modal = document.getElementById('myModal');
+    if (modal && modal.style.display === 'flex') return;
+    
+    animateCameraStep();
+
+    if (autoMoveInterval) clearInterval(autoMoveInterval);
+    autoMoveInterval = setInterval(animateCameraStep, 4000);
 }
 
 function stopAndResetTimer() {
+    // Останавливаем автоматическое плавание
+    if (autoMoveInterval) {
+        clearInterval(autoMoveInterval);
+        autoMoveInterval = null;
+    }
+    
     clearTimeout(rotateTimeout);
+    // Через 4 секунды тишины возобновляем динамический просмотр
     rotateTimeout = setTimeout(startAutoRotate, delayTime);
 }
 
+// Отслеживаем активность пользователя
 const panoElement = document.getElementById('panorama');
 panoElement.addEventListener('mousedown', stopAndResetTimer);
 panoElement.addEventListener('mousemove', stopAndResetTimer);
 panoElement.addEventListener('touchstart', stopAndResetTimer);
+panoElement.addEventListener('wheel', stopAndResetTimer);
 
-// Открытие модального окна (ручной клик)
+// Запуск динамической камеры сразу при загрузке
+startAutoRotate();
+
+// Открытие модального окна
 function showModal(imageSrc) {
     const modal = document.getElementById('myModal');
     const modalImg = document.getElementById('modalImg');
@@ -143,14 +184,18 @@ function showModal(imageSrc) {
     modalImg.src = imageSrc;
     modal.style.display = 'flex';
     
-    // Останавливаем вращение, пока открыто фото стенда
-    if (viewer) viewer.stopAutoRotate();
+    // Полностью глушим движение, пока открыт стенд
+    if (autoMoveInterval) {
+        clearInterval(autoMoveInterval);
+        autoMoveInterval = null;
+    }
+    clearTimeout(rotateTimeout);
 }
 
 // Закрытие окна по крестику
 function closeModal() {
     document.getElementById('myModal').style.display = 'none';
-    stopAndResetTimer(); // Возобновляем отсчет для прокрутки
+    stopAndResetTimer();
 }
 </script>
 
