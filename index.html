@@ -143,26 +143,32 @@ const autoInfoSpots = [
     // { pitch: -2.1, yaw: 110.5, img: stand2, triggered: false }
 ];
 
-// Каждые 200 миллисекунд проверяем, куда смотрит камера
-setInterval(function() {
-    if (!viewer) return; // Если плеер еще не загрузился — ждем
+// Список стендов: указываем только горизонтальный угол (yaw) и переменную картинки
+const autoInfoSpots = [
+    { yaw: 42.1, img: stand1, triggered: false } 
+    // Если стендов несколько, добавляйте их сюда:
+    // { yaw: -110.5, img: stand2, triggered: false }
+];
 
-    const currentPitch = viewer.getPitch();
+// Проверяем положение камеры 5 раз в секунду
+setInterval(function() {
+    if (typeof viewer === 'undefined' || !viewer) return;
+
     const currentYaw = viewer.getYaw();
 
     autoInfoSpots.forEach(spot => {
-        // Вычисляем разницу между центром экрана и координатами значка
-        const pitchDiff = Math.abs(currentPitch - spot.pitch);
-        const yawDiff = Math.abs(currentYaw - spot.yaw);
+        // Считаем разницу по горизонтали с учетом перехода через -180/180 градусов
+        let yawDiff = Math.abs(currentYaw - spot.yaw);
+        if (yawDiff > 180) yawDiff = 360 - yawDiff;
 
-        // Если камера наведена на значок (погрешность до 3 градусов) и он еще не открывался:
-        if (pitchDiff < 3 && yawDiff < 3 && !spot.triggered) {
-            spot.triggered = true; // Отмечаем, что уже показали
+        // 1. Увеличили зону до 8 градусов (теперь не надо наводить прямо в "яблочко")
+        // 2. Исключили проверку pitch (вертикаль больше не важна)
+        if (yawDiff < 8 && !spot.triggered) {
+            spot.triggered = true; // Фиксируем показ
             showModal(spot.img);   // Открываем окно на 5 секунд
         } 
-        // Если пользователь отвел камеру подальше (больше 15 градусов) — сбрасываем флаг,
-        // чтобы при повторном подведении стенд снова мог открыться
-        else if ((pitchDiff > 15 || yawDiff > 15) && spot.triggered) {
+        // Если прокрутили дальше (более чем на 25 градусов от стенда) — сбрасываем флаг
+        else if (yawDiff > 25 && spot.triggered) {
             spot.triggered = false;
         }
     });
