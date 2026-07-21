@@ -114,21 +114,28 @@ const viewer = pannellum.viewer('panorama', {
 });
 
 // ==========================================
-// НАСТОЯЩАЯ ДИНАМИКА: НАПЛЫВЫ И ОТДАЛЕНИЯ
+// МЕДЛЕННАЯ РЕЖИССУРА: 12 ПЛАВНЫХ ТОЧЕК
 // ==========================================
 
 let isUserInteracting = false;
 let autoTimer = null;
 let stepIndex = 0;
 
-// Точки режиссуры: плавно меняем Yaw, Pitch (высоту) и HFOV (зум)
-// hfov: 75 — ощутимый НАПЛЫВ (крупный план)
-// hfov: 105 — ОТДАЛЕНИЕ (общий план)
+// Массив из 12 точек с шагом 30 градусов.
+// DURATION 12000-15000 мс (12-15 секунд) делает движение невероятно неторопливым.
 const cameraSteps = [
-    { yaw: 0,    pitch: -5,  hfov: 105, duration: 6000 },
-    { yaw: 90,   pitch: -12, hfov: 75,  duration: 7000 }, // Наплыв с приближением
-    { yaw: 180,  pitch: -3,  hfov: 100, duration: 6000 }, // Отдаление
-    { yaw: 270,  pitch: -10, hfov: 80,  duration: 7000 }  // Снова наплыв
+    { yaw: 0,   pitch: -4,  hfov: 100, duration: 12000 },
+    { yaw: 30,  pitch: -8,  hfov: 90,  duration: 14000 }, // Мягкий наплыв
+    { yaw: 60,  pitch: -12, hfov: 85,  duration: 15000 }, // Максимальное приближение к стене
+    { yaw: 90,  pitch: -7,  hfov: 95,  duration: 13000 }, // Неторопливое отдаление
+    { yaw: 120, pitch: -3,  hfov: 102, duration: 12000 }, // Общий план
+    { yaw: 150, pitch: -6,  hfov: 92,  duration: 14000 }, // Наплыв на следующий угол
+    { yaw: 180, pitch: -10, hfov: 88,  duration: 15000 }, // Рассмотрение экспонатов
+    { yaw: 210, pitch: -5,  hfov: 98,  duration: 13000 }, 
+    { yaw: 240, pitch: -2,  hfov: 102, duration: 12000 }, // Отход назад
+    { yaw: 270, pitch: -7,  hfov: 90,  duration: 14000 }, // Акцент на стенде
+    { yaw: 300, pitch: -11, hfov: 86,  duration: 15000 }, 
+    { yaw: 330, pitch: -5,  hfov: 96,  duration: 13000 }
 ];
 
 function playNextCameraStep() {
@@ -136,13 +143,13 @@ function playNextCameraStep() {
 
     const step = cameraSteps[stepIndex];
 
-    // Выполняем плавный переход длительностью 'duration' миллисекунд
+    // Метод lookAt плавно растягивает переход на указанные секунды (duration)
     viewer.lookAt(step.pitch, step.yaw, step.hfov, step.duration);
 
     // Переходим к следующей точке
     stepIndex = (stepIndex + 1) % cameraSteps.length;
 
-    // Запускаем следующий шаг ровно тогда, когда закончится текущий
+    // Запускаем следующий шаг ровно тогда, когда завершится текущий
     autoTimer = setTimeout(playNextCameraStep, step.duration);
 }
 
@@ -150,16 +157,16 @@ function stopCameraAnimation() {
     isUserInteracting = true;
     if (autoTimer) clearTimeout(autoTimer);
     
-    // Если пользователь отпустил мышь — ждем 5 секунд и возобновляем режиссуру
+    // Если посетитель отпустил мышь — ждем 5 секунд и возобновляем плавание
     clearTimeout(window.resumeTimer);
     window.resumeTimer = setTimeout(function() {
         isUserInteracting = false;
-        // Синхронизируем текущий угол пользователя с циклом
+        
+        // Синхронизируем траекторию автокамеры с текущим углом поворота пользователя
         const currentYaw = viewer.getYaw();
-        cameraSteps[0].yaw = currentYaw + 90;
-        cameraSteps[1].yaw = currentYaw + 180;
-        cameraSteps[2].yaw = currentYaw + 270;
-        cameraSteps[3].yaw = currentYaw + 360;
+        for (let i = 0; i < cameraSteps.length; i++) {
+            cameraSteps[i].yaw = currentYaw + (i * 30);
+        }
         stepIndex = 0;
         playNextCameraStep();
     }, 5000);
