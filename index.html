@@ -114,76 +114,102 @@ const viewer = pannellum.viewer('panorama', {
 });
 
 // ==========================================
-// ДИНАМИЧНЫЙ ПОЛЁТ: СОЧНЫЙ ЗУМ И ОЩУТИМАЯ СКОРОСТЬ
+// СЛУЧАЙНЫЙ ПОЛЁТ С ВЕРТИКАЛЬНЫМ СКАННИРОВАНИЕМ СТЕНДОВ
 // ==========================================
 
 let isUserInteracting = false;
 let autoTimer = null;
-let stepIndex = 0;
 
-// hfov: 45 — ГЛУБОКИЙ НАПЛЫВ (крупный план)
-// hfov: 125 — ДАЛЕКИЙ ОТХОД (широкий угол, видишь весь зал)
-// duration: 4000-5000 мс — полёт ощутим глазом, а не "ползёт как улитка"
-const cameraSteps = [
-    { yaw: 0,   pitch: -5,  hfov: 125, duration: 4500 }, // Далёкий отлёт назад (широкий план)
-    { yaw: 35,  pitch: -12, hfov: 50,  duration: 5000 }, // МОЩНЫЙ НАПЛЫВ вглубь на стенд
-    { yaw: 70,  pitch: -2,  hfov: 115, duration: 4500 }, // Быстрый отлёт в другую сторону
-    { yaw: 110, pitch: -10, hfov: 45,  duration: 5000 }, // Глубокое приближение к экспонату
-    { yaw: 150, pitch: -4,  hfov: 120, duration: 4500 }, // Отлёт назад
-    { yaw: 190, pitch: -14, hfov: 55,  duration: 5000 }, // Наплыв с изменением высоты
-    { yaw: 230, pitch: -3,  hfov: 115, duration: 4500 }, // Отлёт назад
-    { yaw: 270, pitch: -12, hfov: 48,  duration: 5000 }, // Мощное приближение
-    { yaw: 310, pitch: -5,  hfov: 125, duration: 4500 }  // Возврат на широкий угол
-];
+// Функция для генерации случайных чисел
+function getRandom(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-function playNextCameraStep() {
+function playRandomCameraStep() {
     if (isUserInteracting || !viewer) return;
 
-    const step = cameraSteps[stepIndex];
+    const currentYaw = viewer.getYaw();
+    
+    // 1. Направление поворота (в основном вперед на 40-75 градусов)
+    const direction = Math.random() > 0.15 ? 1 : -1; 
+    const targetYaw = currentYaw + (getRandom(40, 75) * direction);
 
-    // Выполняем ощутимый перелёт
-    viewer.lookAt(step.pitch, step.yaw, step.hfov, step.duration);
+    // 2. Решаем: делаем НАПЛЫВ с вертикальным сканированием или просто ОТХОД на общий план?
+    const isZoomIn = Math.random() > 0.4; // 60% chance for close-up scan
 
-    stepIndex = (stepIndex + 1) % cameraSteps.length;
+    if (isZoomIn) {
+        // === СЦЕНАРИЙ 1: НАПЛЫВ + ВЕРТИКАЛЬНЫЙ ОСМОТР ===
+        
+        // Случайно решаем: начинаем СНИЗУ вверх или СВЕРХУ вниз
+        const startFromBottom = Math.random() > 0.5;
+        
+        // Нижняя точка (-15...-10 град) и Верхняя точка (-4...-1 град)
+        const bottomPitch = getRandom(-15, -10);
+        const topPitch = getRandom(-4, -1);
 
-    // Сразу планируем следующий перелёт ровно по окончании текущего
-    autoTimer = setTimeout(playNextCameraStep, step.duration);
+        const initialPitch = startFromBottom ? bottomPitch : topPitch;
+        const finalPitch = startFromBottom ? topPitch : bottomPitch;
+
+        const targetHfov = getRandom(45, 58); // Глубокий наплыв
+        const moveDuration = getRandom(3500, 4500); // Время подлёта
+        const scanDuration = getRandom(4000, 5500); // Время медленного движения по вертикали
+
+        // ШАГ 1: Подлетаем к стенду (в нижнюю или верхнюю часть)
+        viewer.lookAt(initialPitch, targetYaw, targetHfov, moveDuration);
+
+        // ШАГ 2: После прилёта запускаем плавное движение по вертикали (вверх или вниз)
+        autoTimer = setTimeout(function() {
+            if (isUserInteracting) return;
+
+            // Медленно ведем камеру по вертикали, сохраняя Yaw и Hfov
+            viewer.lookAt(finalPitch, targetYaw, targetHfov, scanDuration);
+
+            // ШАГ 3: Завершаем осмотр, пауза 1.5 сек и переход к следующей точке
+            autoTimer = setTimeout(playRandomCameraStep, scanDuration + 1500);
+
+        }, moveDuration + 500); // Небольшая пауза 0.5сек перед началом вертикального движения
+
+    } else {
+        // === СЦЕНАРИЙ 2: ОТХОД НА ОБЩИЙ ПЛАН ===
+        
+        const targetPitch = getRandom(-12, -3);
+        const targetHfov = getRandom(105, 122); // Широкий угол
+        const duration = getRandom(3500, 4500);
+
+        viewer.lookAt(targetPitch, targetYaw, targetHfov, duration);
+
+        // Пауза 2 секунды на общем плане и следующий шаг
+        autoTimer = setTimeout(playRandomCameraStep, duration + 2000);
+    }
 }
 
 function stopCameraAnimation() {
     isUserInteracting = true;
     if (autoTimer) clearTimeout(autoTimer);
     
-    // После действия пользователя ждем 4 секунды и снова запускаем полёт
+    // После действий пользователя ждем 4 секунды и возобновляем режиссёрский просмотр
     clearTimeout(window.resumeTimer);
     window.resumeTimer = setTimeout(function() {
         isUserInteracting = false;
-        
-        // Пересчитываем траекторию от текущей точки пользователя
-        const currentYaw = viewer.getYaw();
-        for (let i = 0; i < cameraSteps.length; i++) {
-            cameraSteps[i].yaw = currentYaw + (i * 40);
-        }
-        stepIndex = 0;
-        playNextCameraStep();
+        playRandomCameraStep();
     }, 4000);
 }
 
-// Отслеживание действий пользователя
+// Отслеживание действий пользователя (мышь, тач, колесо)
 const panoElement = document.getElementById('panorama');
 panoElement.addEventListener('mousedown', stopCameraAnimation);
 panoElement.addEventListener('touchstart', stopCameraAnimation);
 panoElement.addEventListener('wheel', stopCameraAnimation);
 
-// ЗАПУСКАЕМ СРАЗУ: без длинных задержек при загрузке
+// Запуск сразу после загрузки
 viewer.on('load', function() {
-    playNextCameraStep();
+    playRandomCameraStep();
 });
 
-// Если событие load уже проскочило — стартуем через 300мс
+// Запасной старт
 setTimeout(function() {
     if (!isUserInteracting && !autoTimer) {
-        playNextCameraStep();
+        playRandomCameraStep();
     }
 }, 300);
 
